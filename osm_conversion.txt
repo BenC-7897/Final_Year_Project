@@ -1,0 +1,96 @@
+import time # Import time module for handling delays and timeouts.
+from geopy.geocoders import Nominatim # Import Nominatim geocoder for reverse geocoding.
+from geopy.exc import GeocoderTimedOut # Import exception handling for geocoding timeouts.
+import pandas as pd # Import pandas for data manipulation and processing.
+import os # Import os module for file and directory operations.
+from google.colab import drive # Import Google Drive module for accessing files in Google Colab
+
+# Mount Google Drive
+drive.mount('/content/drive')
+
+# Initialise the Nominatim geolocator with a timeout
+geolocator = Nominatim(user_agent="osm_correction", timeout=10)
+
+# Function to fetch OSM data with a retry mechanism  
+def retry_location_fetch(latitude, longitude, retries=3):
+    for attempt in range(retries):
+        try:
+            location = geolocator.reverse((latitude, longitude), exactly_one=True)
+            if location and 'osm_id' in location.raw and 'osm_type' in location.raw:
+                return location.raw['osm_id'], location.raw['osm_type']
+            else:
+                return -1, 'unknown'
+        except GeocoderTimedOut:
+            print(f"Timeout occurred for coordinates ({latitude}, {longitude}). Retrying... ({attempt + 1}/{retries})")
+        except Exception as e:
+            print(f"Error fetching OSM data for coordinates ({latitude}, {longitude}): {e}")
+            break
+    return -1, 'unknown'
+
+# Define a function to fetch OSM_IDs and OSM_Types for a data block
+def OSM_ID(data_block):
+    for index, row in data_block.iterrows():
+        osm_id, osm_type = retry_location_fetch(row['Latitude'], row['Longitude'])
+        data_block.at[index, 'OSM_ID'] = osm_id
+        data_block.at[index, 'OSM_Type'] = osm_type
+    return data_block
+
+# Save progress to a checkpoint file
+def checkpoint(data, output_file, checkpoint_file, processed_chunks):
+    data.to_csv(output_file, index=False)
+    with open(checkpoint_file, 'w') as f:
+        f.write(str(processed_chunks))
+
+# Resume progress from the last checkpoint
+def checkpoint_resumption(checkpoint_file):
+    if os.path.exists(checkpoint_file):
+        with open(checkpoint_file, 'r') as f:
+            return int(f.read().strip())
+    return 0
+
+# Save each processed chunk as a separate CSV file
+def save_chunk(data_block, chunk_number, output_directory):
+    chunk_file = os.path.join(output_directory, f"processed_chunk_{chunk_number}.csv")
+    data_block.to_csv(chunk_file, index=False)
+    print(f"Chunk {chunk_number} saved as {chunk_file}")
+
+# Main function to process data
+def OSM_process(file_path, output_directory, checkpoint_path, chunk_size=1700):
+    data = pd.read_csv(file_path)
+
+    # Ensure the dataset has 'Latitude' and 'Longitude' columns
+    if 'Latitude' not in data.columns or 'Longitude' not in data.columns:
+        raise ValueError("The dataset must contain 'Latitude' and 'Longitude' columns.")
+
+    # Resume from the last checkpoint
+    processed_chunks = checkpoint_resumption(checkpoint_path)
+    number_of_chunks = len(data) // chunk_size + (len(data) % chunk_size > 0)
+
+    for i in range(processed_chunks, number_of_chunks):
+        start_index = i * chunk_size
+        end_index = min(start_index + chunk_size, len(data))
+        data_block = data.iloc[start_index:end_index]
+
+        # Process the current chunk
+        print(f"Processing Chunk {i+1} of {number_of_chunks}")
+        data_block = OSM_ID(data_block)
+
+        # Save the current chunk as a separate file
+        save_chunk(data_block, i + 1, output_directory)
+
+        # Save progress after each chunk
+        checkpoint(data, os.path.join(output_directory, "enriched_file.csv"), checkpoint_path, i + 1)
+        print(f"Chunk {i+1} processed and checkpoint saved.")
+
+    print(f"Processing complete. All chunks saved in {output_dir}")
+
+# File paths
+file_path = '/content/drive/My Drive/combined_collision_v3/Heatmap_file.csv' # Input file
+output_directory = '/content/drive/My Drive/ProcessedChunks/' # Directory to save chunks
+checkpoint_path = 'checkpoint.txt' # Checkpoint file
+
+# Ensure the output directory exists
+os.makedirs(output_directory, exist_ok=True)
+
+# Run the process
+OSM_process(file_path, output_directory, checkpoint_path)
