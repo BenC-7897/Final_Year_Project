@@ -51,16 +51,16 @@ for osm_id, mean_severity in mean_street_severity.items():
         else:
             geometries = [geometry_data]
         # Map the severity score to a colour on the colour scale
-        colour = colors.to_hex(colour_map.to_rgba(mean_severity))
+        color = colors.to_hex(colour_map.to_rgba(mean_severity))
         # Add the street geometries to the Folium map
         for geometry in geometries:
             if geometry.geom_type == 'LineString':
                 locations = [(point[1], point[0]) for point in geometry.coords]
-                folium.PolyLine(locations, colour=colour, weight=5).add_to(m)
+                folium.PolyLine(locations, color=color, weight=5).add_to(m)
             elif geometry.geom_type == 'MultiLineString':
                 for line in geometry:
                     locations = [(point[1], point[0]) for point in line.coords]
-                    folium.PolyLine(locations, colour=colour, weight=5).add_to(m)
+                    folium.PolyLine(locations, color=color, weight=5).add_to(m)
         # Increment the counter for successfully processed streets
         total_processed += 1
     except Exception as e:
