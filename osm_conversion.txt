@@ -1,8 +1,8 @@
-import time # Import time module for handling delays and timeouts.
-from geopy.geocoders import Nominatim # Import Nominatim geocoder for reverse geocoding.
-from geopy.exc import GeocoderTimedOut # Import exception handling for geocoding timeouts.
-import pandas as pd # Import pandas for data manipulation and processing.
-import os # Import os module for file and directory operations.
+import time # Import time module for handling delays and timeouts 
+from geopy.geocoders import Nominatim # Import Nominatim geocoder for reverse geocoding
+from geopy.exc import GeocoderTimedOut # Import exception handling for geocoding timeouts
+import pandas as pd # Import pandas for data manipulation and processing
+import os # Import os module for file and directory operations
 from google.colab import drive # Import Google Drive module for accessing files in Google Colab
 
 # Mount Google Drive
@@ -93,4 +93,5 @@ checkpoint_path = 'checkpoint.txt' # Checkpoint file
 os.makedirs(output_directory, exist_ok=True)
 
 # Run the process
+
 OSM_process(file_path, output_directory, checkpoint_path)
